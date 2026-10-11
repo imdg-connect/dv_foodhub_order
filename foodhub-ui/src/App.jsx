@@ -11,7 +11,7 @@ import {
 const API_URL = "/api/ask";    // agents_api  -> http://127.0.0.1:8003/ask
 const DASH_URL = "/dash";      // dashboard_api  (/start /stop /status)  -> http://127.0.0.1:8002
 const DATA_URL = "/api";       // agents_api     (/orders, /ws SQLite)   -> http://127.0.0.1:8003
-const STATUS_POLL_MS = 3000;
+const STATUS_POLL_MS = 2000;
 
 const PALETTE = ["#7c8cff", "#31e0c4", "#ff6fae", "#ffb454", "#5ec2ff", "#b58cff", "#9be564", "#ff8a65"];
 
@@ -286,7 +286,10 @@ function GraphsPanel({ state }) {
 
 /* ------------------------------------------------------------------ live data hook (right, 30%) */
 // dashboard_api.status() -> feed.status(); accept a few likely shapes
-const isRunning = (s) => Boolean(s?.running ?? s?.live_feed ?? s?.status === "running");
+const isRunning = (s) => {
+  if (s?.stopping) return false;   // stop was called: show OFF right away while the last EDA finishes
+  return Boolean(s?.running ?? s?.live_feed ?? s?.status === "running");
+};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function useDashboard() {
@@ -319,13 +322,18 @@ function useDashboard() {
       })
       .then((d) => { setRows(d); setUpdated(new Date()); setDataErr(null); setLoaded(true); })
       .catch((e) => setDataErr(e.message));
-    readStatus().catch((e) => setErr(e.message));
+     readStatus().catch((e) => setErr(e.message));      // ONE status check on page load only
+  }, [readStatus]);
+  useEffect(() => {
+    if (!running) return;                              // toggle OFF -> no polling
     const id = setInterval(() => readStatus().catch(() => {}), STATUS_POLL_MS);
     return () => clearInterval(id);
-  }, [readStatus]);
-
+  }, [running, readStatus]);
+  
   // websocket: server pushes rows whenever the SQLite data changes (auto-reconnect)
+    // websocket: open ONLY while the toggle is ON (running = true); closed otherwise
   useEffect(() => {
+    if (!running) return;                            // toggle OFF -> no websocket at all
     let ws, timer, closed = false;
     const connect = () => {
       const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -339,8 +347,19 @@ function useDashboard() {
       ws.onerror = () => ws.close();
     };
     connect();
-    return () => { closed = true; clearTimeout(timer); ws?.close(); };
-  }, []);
+    return () => {                                   // toggle just went OFF
+      closed = true;                                 // stop auto-reconnect
+      clearTimeout(timer);
+      const last = ws;
+      setTimeout(() => {                             // 10 s grace so the last EDA's rows can arrive
+        last?.close();
+        fetch(`${DATA_URL}/orders`)                  // one final refresh, then silence
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => { if (d) { setRows(d); setUpdated(new Date()); } })
+          .catch(() => {});
+      }, 10000);
+    };
+  }, [running]);
 
   // toggle: ON -> POST /start, OFF -> POST /stop, then wait for status() to confirm
   // (after /stop the current EDA run may still be finishing, so status can lag)
@@ -348,7 +367,13 @@ function useDashboard() {
     const want = !running;
     setBusy(true);
     try {
-      const res = await fetch(`${DASH_URL}/${want ? "start" : "stop"}`, { method: "POST" });
+      let res;
+      for (let i = 0; i < 10; i++) {              // retry while the server says "still finishing the last run"
+        res = await fetch(`${DASH_URL}/${want ? "start" : "stop"}`, { method: "POST" });
+        if (res.status !== 409) break;
+        await sleep(1000);
+      }
+      
       if (!res.ok) {
         let detail = ""; try { detail = (await res.json()).detail; } catch {}
         throw new Error(detail || (res.status === 404 ? "no /start or /stop on :8002 – wrong app or old process" : `${want ? "start" : "stop"} ${res.status}`));
@@ -621,6 +646,7 @@ function Dashboard({ dash, m }) {
         </div>
       </div>
 
+      
       {!m ? (
         dataErr ? (
           <div className="plastic card error"><h3><AlertTriangle size={15} /> Can't load orders</h3><div style={{ fontSize: 14 }}>{dataErr}</div></div>

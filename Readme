@@ -1,0 +1,21 @@
+---
+title: FoodHub Command Center
+emoji: 🍔
+colorFrom: indigo
+colorTo: pink
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# FoodHub Command Center
+
+Multi-agent analytics over FoodHub orders: ask questions in plain English, see generated graphs,
+and watch a live dashboard (React + Vite, FastAPI, SQLite).
+
+Run locally:
+
+```bash
+npm --prefix foodhub-ui ci && npm --prefix foodhub-ui run build
+uvicorn app:app --port 7860      # open http://localhost:7860
+```
