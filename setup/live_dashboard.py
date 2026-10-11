@@ -1,22 +1,3 @@
-"""
-live_dashboard.py - keeps the FoodHub demo data "alive".
-
-Every INTERVAL seconds (default 5) it does ONE change to data/foodhub_order.csv:
-  - usually adds 1 new order, sometimes updates 1 old order (a customer finally leaves the
-    rating that was 'Not given'), saved in the same file
-  then runs the EDA and WAITS until it finishes before the next change, so
-  processed/foodhub_order_output.csv and processed/foodhub.db are always rebuilt from a
-  complete file.
-
-Lives in setup/ (or the project root). Run from the project root (the folder that contains data/ and processed/):
-
-    python setup/live_dashboard.py
-    python setup/live_dashboard.py --eda-url http://127.0.0.1:8001/run-eda --interval 5
-
-Stop with Ctrl+C. Runs until stopped.
-
-FastAPI can also drive it: see LiveFeed (start / stop / status) and api/dashboard_api.py.
-"""
 from __future__ import annotations
 
 import argparse

@@ -115,7 +115,7 @@ function ReportPanel({ state }) {
         <h3><AlertTriangle size={15} /> Request failed</h3>
         <div style={{ fontSize: 14 }}>{error}</div>
         <div style={{ fontSize: 12, color: "#8b92b0", marginTop: 8 }}>
-          Check that the API is running on http://127.0.0.1:8003.
+          Check that the API is running
         </div>
       </div>
     );
