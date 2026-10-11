@@ -31,17 +31,32 @@ from api.agents_api import app as agents_app        # noqa: E402
 from api.dashboard_api import app as dashboard_app  # noqa: E402
 from api.eda_api import app as eda_app              # noqa: E402
 
-# ZeroGPU Spaces refuse to start an app that has no @spaces.GPU function. This app is CPU-only, so we declare
-# a placeholder that is never called (ZeroGPU allocates a GPU only when it is called, so it costs nothing).
-# On any other host the `spaces` package is absent and this block is skipped.
+# ---- ZeroGPU compatibility -------------------------------------------------------------------------------
+# ZeroGPU Spaces refuse to start unless a @spaces.GPU function is wired into a Gradio app. This app is CPU-only,
+# so we add a tiny hidden Gradio page (served at /gradio) whose button calls a placeholder GPU function.
+# ZeroGPU allocates a GPU only when that function is called, so it costs nothing. On any other host
+# (your PC, Render, ...) this just becomes a harmless extra page, or is skipped if gradio is not installed.
 try:
-    import spaces
+    import gradio as gr
 
-    @spaces.GPU(duration=1)
-    def _zerogpu_placeholder():
+    try:
+        import spaces
+        _gpu = spaces.GPU(duration=1)
+    except ImportError:                              # not on ZeroGPU: plain function
+        _gpu = lambda f: f                           # noqa: E731
+
+    @_gpu
+    def _zerogpu_probe() -> str:
         return "ok"
+
+    with gr.Blocks() as _probe_ui:
+        gr.Markdown("FoodHub: ZeroGPU probe page (unused). The app is at the site root.")
+        _btn = gr.Button("probe")
+        _out = gr.Textbox()
+        _btn.click(_zerogpu_probe, None, _out)
+    HAVE_GRADIO = True
 except ImportError:
-    pass
+    HAVE_GRADIO = False
 
 app = FastAPI(title="FoodHub Command Center")
 
@@ -54,6 +69,9 @@ def healthz():
 app.mount("/api", agents_app)
 app.mount("/dash", dashboard_app)
 app.mount("/eda", eda_app)
+
+if HAVE_GRADIO:                                    # must come BEFORE the static "/" mount below
+    app = gr.mount_gradio_app(app, _probe_ui, path="/gradio", ssr_mode=False)
 
 DIST = ROOT / "foodhub-ui" / "dist"
 if DIST.exists():                                  # mounted last so it never shadows the API routes
