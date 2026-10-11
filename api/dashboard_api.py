@@ -70,4 +70,4 @@ def stop():
 
 @app.get("/status")
 def status():
-    return {**feed.status(), "auto_off_seconds": AUTO_OFF_S}
+    return {**feed.status(), "auto_off_seconds": AUTO_OFF_S} 

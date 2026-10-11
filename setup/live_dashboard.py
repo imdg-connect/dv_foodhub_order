@@ -100,7 +100,7 @@ class Profile:
         cid = num("customer_id").dropna().astype(int)
         self.cust_min, self.cust_max = int(cid.min()), int(cid.max())
         self.customer_pool = cid.astype(str).tolist()          # one entry per order = natural frequency
-        self.customer_set = set(self.customer_pool)
+        self.customer_set = set(self.customer_pool) 
 
     def new_order(self, rng: random.Random, order_id: int, columns: list) -> dict:
         rest = rng.choices(self.rest_names, weights=self.rest_weights)[0]

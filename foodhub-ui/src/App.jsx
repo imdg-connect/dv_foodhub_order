@@ -323,13 +323,13 @@ function useDashboard() {
       .then((d) => { setRows(d); setUpdated(new Date()); setDataErr(null); setLoaded(true); })
       .catch((e) => setDataErr(e.message));
      readStatus().catch((e) => setErr(e.message));      // ONE status check on page load only
-  }, [readStatus]);
+  }, [readStatus]); 
   useEffect(() => {
     if (!running) return;                              // toggle OFF -> no polling
     const id = setInterval(() => readStatus().catch(() => {}), STATUS_POLL_MS);
     return () => clearInterval(id);
   }, [running, readStatus]);
-  
+
   // websocket: server pushes rows whenever the SQLite data changes (auto-reconnect)
     // websocket: open ONLY while the toggle is ON (running = true); closed otherwise
   useEffect(() => {
